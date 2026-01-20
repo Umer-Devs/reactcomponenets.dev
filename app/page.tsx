@@ -13,6 +13,8 @@ import {
   History,
   X,
   Smartphone,
+  Tablet,
+  MessageSquare,
   ChevronRight,
   Monitor,
   RotateCcw,
@@ -31,8 +33,12 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [view, setView] = useState<'code' | 'preview'>('preview');
-  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const [device, setDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [componentName, setComponentName] = useState('MyComponent');
+  const [isRefining, setIsRefining] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load history from localStorage
@@ -55,11 +61,10 @@ export default function Home() {
       .replace(/export\s+/g, '')
       .trim();
 
-    const detectedIcons = Array.from(cleanCode.matchAll(/<([A-Z][a-zA-Z0-9]+)/g))
-      .map(match => match[1])
-      .filter(name => !['div', 'span', 'button', 'App', 'Component', 'Main', 'section', 'header', 'footer', 'input', 'label', 'Nav', 'Link'].includes(name));
-
-    const iconDeclarations = Array.from(new Set(detectedIcons))
+    // Icons to be mapped
+    const detectedIcons = Array.from(new Set(Array.from(cleanCode.matchAll(/<([A-Z][a-zA-Z0-9]+)/g)).map(m => m[1])));
+    const iconDeclarations = detectedIcons
+      .filter(name => !['div', 'span', 'button', 'App', 'Component', 'Main', 'section', 'header', 'footer', 'input', 'label', 'Nav', 'Link'].includes(name))
       .map(name => `window.${name} = IconProxy['${name}'];`)
       .join('\n');
 
@@ -68,15 +73,14 @@ export default function Home() {
       <html>
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <script src="https://cdn.tailwindcss.com"></script>
           <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
           <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
           <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
           <script src="https://unpkg.com/lucide@latest"></script>
-          <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
           <style>
-            * { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); box-sizing: border-box; }
+            * { transition: all 0.2s cubic-bezier(0.19,1,0.22,1); box-sizing: border-box; }
             body { 
               background: #020617; 
               color: white; 
@@ -86,69 +90,67 @@ export default function Home() {
               overflow-x: hidden;
             }
             .lucide { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: middle; }
-            ::-webkit-scrollbar { width: 5px; }
-            ::-webkit-scrollbar-track { background: transparent; }
-            ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
             #root { width: 100%; min-height: 100vh; }
-            ${device === 'mobile' ? 'body { padding-top: 20px; } #root { max-width: 400px; margin: 0 auto; }' : ''}
+            ${device === 'mobile' ? 'body { padding: 20px 0; } #root { max-width: 400px; margin: 0 auto; border-radius: 40px; box-shadow: 0 0 0 12px #1e293b, 0 0 0 16px #0f172a; overflow: hidden; }' : ''}
+            ${device === 'tablet' ? 'body { padding: 40px 0; } #root { max-width: 768px; margin: 0 auto; border-radius: 30px; box-shadow: 0 0 0 8px #1e293b; overflow: hidden; }' : ''}
           </style>
         </head>
         <body>
           <div id="root"></div>
           <script type="text/babel">
-            const { useState, useEffect, useMemo, useRef, useCallback } = React;
+            const { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } = React;
             
             const IconProxy = new Proxy({}, {
               get: (target, name) => (props) => {
-                if (typeof lucide === 'undefined') return <span className="w-4 h-4 bg-slate-800 rounded animate-pulse inline-block" />;
-                const iconName = name.charAt(0).toLowerCase() + name.slice(1);
-                const iconDef = lucide.icons[iconName] || lucide.icons['helpCircle'];
+                if (!window.lucide) return <div className="w-4 h-4 bg-white/10 rounded animate-pulse" />;
+                const kebabName = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+                const iconDef = window.lucide.icons[kebabName] || window.lucide.icons[name.toLowerCase()] || window.lucide.icons['help-circle'];
                 if (!iconDef) return null;
                 const [tag, attrs, children] = iconDef;
-                return React.createElement(
-                  tag,
-                  {
-                    ...attrs,
-                    ...props,
-                    className: \`lucide lucide-\${iconName} \${props.className || ''}\`,
-                    width: props.size || attrs.width,
-                    height: props.size || attrs.height,
-                  },
-                  children ? children.map(([childTag, childAttrs], idx) => 
-                    React.createElement(childTag, { ...childAttrs, key: idx })
-                  ) : null
-                );
+                return React.createElement(tag, {
+                  ...attrs, ...props, 
+                  className: "lucide lucide-" + kebabName + " " + (props.className || ''),
+                  width: props.size || attrs.width || 24,
+                  height: props.size || attrs.height || 24
+                }, children ? children.map(([childTag, childAttrs], idx) => React.createElement(childTag, { ...childAttrs, key: idx })) : null);
               }
             });
 
-            window.LucideIcons = IconProxy;
+            window.IconProxy = IconProxy;
             ${iconDeclarations}
-            window.Lucide = IconProxy;
 
             try {
               ${cleanCode}
-              const root = ReactDOM.createRoot(document.getElementById('root'));
-              let Target = typeof Component !== 'undefined' ? Component : (typeof App !== 'undefined' ? App : null);
               
+              const isEdit = ${isRefining};
+              const compName = "${componentName}";
+              
+              // Force attach to window if not already there
+              if (typeof ${componentName} === 'function') window.${componentName} = ${componentName};
+              if (typeof Component === 'function') window.Component = Component;
+
+              const root = ReactDOM.createRoot(document.getElementById('root'));
+              let Target = window[compName] || window.Component || window.App;
+
               if (!Target) {
-                const functions = Object.keys(window).filter(key => 
-                  typeof window[key] === 'function' && 
-                  key.charAt(0) === key.charAt(0).toUpperCase() && 
-                  !['React', 'ReactDOM', 'Babel', 'IconProxy'].includes(key)
-                );
-                if (functions.length > 0) Target = window[functions[functions.length - 1]];
+                const globalFuncs = Object.keys(window).filter(k => k[0] === k[0].toUpperCase() && typeof window[k] === 'function' && !['IconProxy', 'React', 'ReactDOM'].includes(k));
+                if (globalFuncs.length > 0) Target = window[globalFuncs[globalFuncs.length - 1]];
               }
 
               if (Target) {
                 root.render(<Target />);
               } else {
-                root.render(<div className="p-10 text-slate-500 text-center font-bold uppercase tracking-widest text-[10px]">Component Signature Not Found</div>);
+                root.render(<div className="flex items-center justify-center min-h-screen text-slate-500 font-bold uppercase tracking-widest text-xs">Waiting for component signal...</div>);
               }
             } catch (err) {
+              console.error("Frame Error:", err);
               document.getElementById('root').innerHTML = \`
-                <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); padding: 32px; border-radius: 24px; max-width: 500px; margin: 60px auto; font-family: sans-serif; backdrop-blur: 20px;">
-                  <h3 style="color: #fb7185; margin-top: 0; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">Runtime Exception</h3>
-                  <p style="color: #fda4af; font-size: 12px; line-height: 1.6; font-weight: 500;">\${err.message}</p>
+                <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); padding: 40px; border-radius: 32px; max-width: 600px; margin: 100px auto; font-family: 'Plus Jakarta Sans', sans-serif; backdrop-filter: blur(20px);">
+                  <h3 style="color: #fb7185; margin: 0 0 16px 0; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em;">Synthesis Error</h3>
+                  <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 16px; font-family: monospace; font-size: 13px; color: #fda4af; line-height: 1.6; border: 1px solid rgba(255,255,255,0.05); overflow: auto;">
+                    \${err.message}
+                  </div>
+                  <p style="color: #94a3b8; font-size: 11px; margin-top: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">Check console for detailed stack trace</p>
                 </div>
               \`;
             }
@@ -164,12 +166,17 @@ export default function Home() {
     setIsLoading(true);
     setCompletion('');
     setView('preview');
+    setIsNameModalOpen(false);
 
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          componentName,
+          existingCode: isRefining ? completion : undefined
+        }),
       });
 
       if (!response.ok) throw new Error('Failed to generate');
@@ -206,11 +213,32 @@ export default function Home() {
   };
 
   const handleClear = () => {
-    setPrompt('');
-    setCompletion('');
+    if (confirm('Are you sure you want to clear the current component?')) {
+      setPrompt('');
+      setCompletion('');
+    }
+  };
+
+  const clearHistory = () => {
+    if (confirm('Clear all history items?')) {
+      setHistory([]);
+      localStorage.removeItem('ui_gen_history');
+    }
+  };
+
+  const downloadCode = () => {
+    if (!completion) return;
+    const blob = new Blob([completion], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Component.tsx';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
+
     <div className="min-h-screen bg-[#000000] text-slate-100 selection:bg-blue-500/40 flex flex-col font-jakarta overflow-hidden relative">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap');
@@ -361,7 +389,16 @@ export default function Home() {
         )}>
           <div className="flex items-center justify-between">
             <h2 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">Synthesis History</h2>
-            <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[9px]">{history.length}</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-white/5 text-slate-500 text-[9px]">{history.length}</Badge>
+              <button
+                onClick={clearHistory}
+                className="text-[9px] text-slate-600 hover:text-rose-500 font-bold uppercase tracking-wider transition-colors"
+                title="Clear all history"
+              >
+                Clear
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar space-y-3">
             {history.length === 0 ? (
@@ -402,7 +439,7 @@ export default function Home() {
               {isLoading && (
                 <div className="flex items-center gap-2 group cursor-default">
                   <Cpu className="w-3 h-3 text-blue-500 group-hover:animate-spin" />
-                  <span className="text-[9px] font-black uppercase tracking-tighter text-blue-500/60">Claude 3.5 Sonnet @ OpenRouter</span>
+                  <span className="text-[9px] font-black uppercase tracking-tighter text-blue-500/60">Llama 3.3 70B @ Groq</span>
                 </div>
               )}
             </div>
@@ -416,6 +453,15 @@ export default function Home() {
                 )}
               >
                 <Monitor className="w-3.5 h-3.5" /> Desktop
+              </button>
+              <button
+                onClick={() => setDevice('tablet')}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2 rounded-xl text-[10px] font-extrabold uppercase transition-all",
+                  device === 'tablet' ? "bg-white/10 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]" : "text-slate-500 hover:text-white"
+                )}
+              >
+                <Tablet className="w-3.5 h-3.5" /> Tablet
               </button>
               <button
                 onClick={() => setDevice('mobile')}
@@ -432,7 +478,9 @@ export default function Home() {
           {/* Main Visual Display */}
           <div className={cn(
             "flex-1 relative transition-all duration-700 ease-[cubic-bezier(0.19,1,0.22,1)]",
-            device === 'mobile' && view === 'preview' ? "max-w-[420px] mx-auto w-full" : "w-full"
+            device === 'mobile' && view === 'preview' ? "max-w-[420px] mx-auto w-full" :
+              device === 'tablet' && view === 'preview' ? "max-w-[768px] mx-auto w-full" : "w-full",
+            isFullscreen && "fixed inset-0 z-[100] p-4 bg-black/90 backdrop-blur-2xl"
           )}>
             <div className="absolute inset-0 bg-blue-500/5 rounded-[40px] blur-3xl opacity-20 pointer-events-none" />
 
@@ -451,16 +499,51 @@ export default function Home() {
                     preview.umerlabs.com
                   </div>
                 </div>
-                {completion && (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    onClick={copyCode}
-                    className="h-9 px-4 rounded-xl bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 hover:text-blue-400 transition-all font-black text-[9px] uppercase tracking-widest gap-2"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="h-9 w-9 p-0 rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition-all"
+                    title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                   >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {copied ? "COPIED" : "COPY CODE"}
+                    {isFullscreen ? <X className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
                   </Button>
-                )}
+                  {completion && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          setIsRefining(true);
+                          setPrompt('');
+                          textareaRef.current?.focus();
+                        }}
+                        className={cn(
+                          "h-9 px-4 rounded-xl transition-all font-black text-[9px] uppercase tracking-widest gap-2",
+                          isRefining ? "bg-blue-600 text-white" : "bg-white/5 text-blue-400 hover:bg-blue-600/10"
+                        )}
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        {isRefining ? "REFINING..." : "EDIT COMPONENT"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={downloadCode}
+                        className="h-9 px-4 rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white transition-all font-black text-[9px] uppercase tracking-widest gap-2"
+                      >
+                        <RotateCcw className="w-3 h-3 rotate-180" />
+                        DOWNLOAD
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={copyCode}
+                        className="h-9 px-4 rounded-xl bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 hover:text-blue-400 transition-all font-black text-[9px] uppercase tracking-widest gap-2"
+                      >
+                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copied ? "COPIED" : "COPY CODE"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Interaction Canvas */}
@@ -525,40 +608,72 @@ export default function Home() {
           <div className="shrink-0 pb-4">
             <div className="max-w-[1000px] mx-auto w-full relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-[32px] blur-2xl opacity-0 group-hover:opacity-20 group-focus-within:opacity-40 transition-all duration-700" />
-              <div className="relative glass-card rounded-[28px] p-2 flex items-end gap-4 shadow-2xl transition-all border-white/10 group-focus-within:border-blue-500/30">
-                <div className="flex-1 flex flex-col p-4">
-                  <textarea
-                    ref={textareaRef}
-                    value={prompt}
-                    onChange={(e) => {
-                      setPrompt(e.target.value);
-                      e.target.style.height = 'auto';
-                      e.target.style.height = e.target.scrollHeight + 'px';
-                    }}
-                    placeholder="Describe the component (e.g., 'Modern Hero Section with 3D elements')..."
-                    className="w-full bg-transparent border-none text-white placeholder:text-slate-600 text-lg focus:ring-0 outline-none transition-all resize-none font-outfit font-semibold min-h-[50px] max-h-[200px] no-scrollbar py-1"
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleGenerate())}
-                    rows={1}
-                  />
-                </div>
-                <div className="p-3">
-                  <Button
-                    onClick={handleGenerate}
-                    disabled={isLoading || !prompt.trim()}
-                    className="h-16 px-10 bg-white text-black hover:bg-white/90 disabled:bg-white/10 disabled:text-slate-700 rounded-2xl flex items-center gap-3 transition-all duration-500 active:scale-95 shadow-[0_10px_30px_rgba(255,255,255,0.1)] group/btn"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-3">
-                        <Terminal className="w-5 h-5 animate-pulse" />
-                        <span className="text-xs font-black uppercase tracking-widest">Synthesizing...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <Sparkles className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />
-                        <span className="text-xs font-black uppercase tracking-widest">Launch Genius</span>
-                      </div>
-                    )}
-                  </Button>
+              <div className="relative glass-card rounded-[28px] p-2 flex flex-col shadow-2xl transition-all border-white/10 group-focus-within:border-blue-500/30">
+                {isRefining && completion && (
+                  <div className="px-6 py-2 border-b border-white/5 flex items-center justify-between bg-blue-500/5 rounded-t-[26px]">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-[10px] font-black uppercase text-blue-500 tracking-[0.2em]">Refining ${componentName}</span>
+                    </div>
+                    <button
+                      onClick={() => setIsRefining(false)}
+                      className="text-[9px] font-bold text-slate-500 hover:text-white uppercase transition-colors"
+                    >
+                      New Component
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-end gap-4">
+                  <div className="flex-1 flex flex-col p-4">
+                    <textarea
+                      ref={textareaRef}
+                      value={prompt}
+                      onChange={(e) => {
+                        setPrompt(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = e.target.scrollHeight + 'px';
+                      }}
+                      placeholder={isRefining ? "What should I change in this component?" : "Describe a new component..."}
+                      className="w-full bg-transparent border-none text-white placeholder:text-slate-600 text-lg focus:ring-0 outline-none transition-all resize-none font-outfit font-semibold min-h-[50px] max-h-[200px] no-scrollbar py-1"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (prompt.trim()) {
+                            if (isRefining) handleGenerate();
+                            else setIsNameModalOpen(true);
+                          }
+                        }
+                      }}
+                      rows={1}
+                    />
+                  </div>
+                  <div className="p-3">
+                    <Button
+                      onClick={() => {
+                        if (prompt.trim()) {
+                          if (isRefining) handleGenerate();
+                          else setIsNameModalOpen(true);
+                        }
+                      }}
+                      disabled={isLoading || !prompt.trim()}
+                      className={cn(
+                        "h-16 px-10 rounded-2xl flex items-center gap-3 transition-all duration-500 active:scale-95 shadow-2xl group/btn",
+                        isRefining ? "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-500/20" : "bg-white text-black hover:bg-white/90"
+                      )}
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center gap-3">
+                          <Terminal className="w-5 h-5 animate-pulse" />
+                          <span className="text-xs font-black uppercase tracking-widest">Processing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          {isRefining ? <MessageSquare className="w-5 h-5 group-hover/btn:scale-110 transition-transform" /> : <Sparkles className="w-5 h-5 group-hover/btn:rotate-12 transition-transform" />}
+                          <span className="text-xs font-black uppercase tracking-widest">{isRefining ? "Execute Refinement" : "Launch Genius"}</span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -579,6 +694,60 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Component Name Modal */}
+      {isNameModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-0">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"
+            onClick={() => setIsNameModalOpen(false)}
+          />
+          <div className="relative w-full max-w-md glass-card rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="absolute top-6 right-6">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsNameModalOpen(false)}
+                className="rounded-full hover:bg-white/5 text-slate-500 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-6">
+              <div>
+                <h3 className="text-xl font-outfit font-extrabold text-white tracking-tight">Identity of Synthesis</h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">What shall we name this component?</p>
+              </div>
+
+              <div className="relative">
+                <div className="absolute left-5 top-1/2 -translate-y-1/2">
+                  <Terminal className="w-4 h-4 text-blue-500" />
+                </div>
+                <input
+                  type="text"
+                  value={componentName}
+                  onChange={(e) => setComponentName(e.target.value.replace(/\s+/g, ''))}
+                  placeholder="e.g., AboutSection"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-white outline-none focus:border-blue-500/50 transition-all font-mono text-sm"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+                />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={handleGenerate}
+                  className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  INITIALIZE SYNTHESIS
+                </Button>
+                <p className="text-[10px] text-center text-slate-600 font-medium">Use PascalCase for best results (e.g., PricingCard)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Finishing Touch: Bottom Line */}
       <div className="fixed bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent z-[100]" />
