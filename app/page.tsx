@@ -717,7 +717,7 @@ export default function Home() {
             <div className="flex flex-col gap-6">
               <div>
                 <h3 className="text-xl font-outfit font-extrabold text-white tracking-tight">Identity of Synthesis</h3>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">What shall we name this component?</p>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-2">Please Enter The Componenet Name</p>
               </div>
 
               <div className="relative">
