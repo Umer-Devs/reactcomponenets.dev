@@ -740,7 +740,7 @@ export default function Home() {
                   onClick={handleGenerate}
                   className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  INITIALIZE SYNTHESIS
+                 Insert Button
                 </Button>
                 <p className="text-[10px] text-center text-slate-600 font-medium">Use PascalCase for best results (e.g., PricingCard)</p>
               </div>
